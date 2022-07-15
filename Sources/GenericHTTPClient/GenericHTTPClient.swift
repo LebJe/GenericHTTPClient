@@ -42,7 +42,7 @@ public struct GHCHTTPHeaders: ExpressibleByDictionaryLiteral, Sequence {
 
 	public typealias Value = String
 
-	public var headers: [(String, String)] = []
+	public var headers: [(key: String, value: String)] = []
 
 	public init(dictionaryLiteral elements: (String, String)...) {
 		self.headers = elements
@@ -57,13 +57,46 @@ public struct GHCHTTPHeaders: ExpressibleByDictionaryLiteral, Sequence {
 	}
 
 	public subscript(key: String) -> String? {
-		for (k, v) in headers {
-			if k == key {
-				return v
+		get {
+			for (k, v) in self.headers {
+				if k == key {
+					return v
+				}
+			}
+
+			return nil
+		}
+		set {
+			var replacedKey = false
+
+			for i in 0..<self.headers.count {
+				if key == headers[i].key {
+					if let value = newValue {
+						self.headers[i] = (key, value)
+						replacedKey = true
+					} else {
+						self.headers.remove(at: i)
+						replacedKey = true
+					}
+
+					if !replacedKey, let value = newValue {
+						self.headers.append((key, value))
+					}
+				}
 			}
 		}
+	}
 
-		return nil
+	public mutating func append(key: String, value: String) {
+		self.headers.append((key, value))
+	}
+
+	public static func += (lhs: inout GHCHTTPHeaders, rhs: GHCHTTPHeaders) {
+		lhs.headers.append(contentsOf: rhs.headers)
+	}
+
+	public static func + (lhs: GHCHTTPHeaders, rhs: GHCHTTPHeaders) -> GHCHTTPHeaders {
+		GHCHTTPHeaders(lhs.headers + rhs.headers)
 	}
 
 	public func makeIterator() -> GHCHTTPHeadersIterator {
