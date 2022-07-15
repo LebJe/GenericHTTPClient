@@ -1,8 +1,6 @@
 # GenericHTTPClient
 
-
 A generic interface for HTTP clients.
-
 
 ```swift
 import GenericHTTPClient

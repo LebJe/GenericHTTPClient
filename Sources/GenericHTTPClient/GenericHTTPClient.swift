@@ -30,7 +30,7 @@ public struct GHCHTTPRequest {
 			}
 		}
 	}
-	
+
 	public enum HTTPBody {
 		case string(String)
 		case bytes([UInt8])

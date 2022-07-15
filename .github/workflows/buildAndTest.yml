@@ -3,15 +3,15 @@ name: "Build and Test"
 on: ["push", "pull_request"]
 
 jobs:
-  TestOnMacOS-11_0-x86_64:
-    runs-on: "macos-latest"
-    steps:
-      - uses: "actions/checkout@v3"
-      - name: "Run tests"
-        run: "swift test"
-  TestOnUbuntu-20_04-x86_64:
-    runs-on: "ubuntu-latest"
-    steps:
-      - uses: "actions/checkout@v3"
-      - name: "Run tests"
-        run: "swift test"
+    TestOnMacOS-11_0-x86_64:
+        runs-on: "macos-latest"
+        steps:
+            - uses: "actions/checkout@v3"
+            - name: "Run tests"
+              run: "swift test"
+    TestOnUbuntu-20_04-x86_64:
+        runs-on: "ubuntu-latest"
+        steps:
+            - uses: "actions/checkout@v3"
+            - name: "Run tests"
+              run: "swift test"

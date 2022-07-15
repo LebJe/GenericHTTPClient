@@ -32,14 +32,13 @@ public class URLSessionHTTPClient: GHCHTTPClient {
 				} else {
 					body = nil
 				}
-				
+
 				if let httpURLResponse = urlResponse as? HTTPURLResponse {
 					c.resume(returning: GHCHTTPResponse(from: httpURLResponse, body: body))
 				} else {
 					c.resume(throwing: URLSessionClientError.couldNotCastToHTTPURLResponse)
 				}
 
-				
 			}).resume()
 		})
 	}

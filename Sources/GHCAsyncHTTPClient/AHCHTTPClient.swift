@@ -4,8 +4,8 @@
 //
 //  The full text of the license can be found in the file named LICENSE.
 
-import GenericHTTPClient
 import AsyncHTTPClient
+import GenericHTTPClient
 import NIOHTTP1
 
 public class AHCHTTPClient: GHCHTTPClient {
@@ -27,7 +27,11 @@ public class AHCHTTPClient: GHCHTTPClient {
 
 extension HTTPClient.Request {
 	init(from request: GHCHTTPRequest) throws {
-		try self.init(url: request.url, method: .init(from: request.method), headers: HTTPHeaders(request.headers.map({ ($0, $1) })))
+		try self.init(
+			url: request.url,
+			method: .init(from: request.method),
+			headers: HTTPHeaders(request.headers.map({ ($0, $1) }))
+		)
 		if let b = request.body {
 			self.body = .bytes(b)
 		}
