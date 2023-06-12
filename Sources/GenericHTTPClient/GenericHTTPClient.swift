@@ -5,9 +5,13 @@
 //  The full text of the license can be found in the file named LICENSE.
 
 import struct Foundation.URL
+import Logging
 
 public protocol GHCHTTPClient {
-	func send(request: GHCHTTPRequest) async throws -> GHCHTTPResponse
+	associatedtype RequestError: Error
+
+	func send(request: GHCHTTPRequest) async -> Result<GHCHTTPResponse, RequestError>
+	func send(request: GHCHTTPRequest, logger: Logger) async -> Result<GHCHTTPResponse, RequestError>
 	func shutdown()
 }
 

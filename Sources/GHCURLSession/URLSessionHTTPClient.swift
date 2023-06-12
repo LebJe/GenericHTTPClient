@@ -5,6 +5,7 @@
 //  The full text of the license can be found in the file named LICENSE.
 
 import GenericHTTPClient
+import Logging
 
 import Foundation
 
@@ -12,42 +13,56 @@ import Foundation
 	import FoundationNetworking
 #endif
 
+public enum URLSessionError: Error {
+	case couldNotCastToHTTPURLResponse
+	case urlError(URLError)
+	case other(Error)
+}
+
 public class URLSessionHTTPClient: GHCHTTPClient {
+	public typealias RequestError = URLSessionError
+
 	private let urlSession: URLSession
 
 	public init(session: URLSession = .shared) {
 		self.urlSession = session
 	}
 
-	public func send(request: GHCHTTPRequest) async throws -> GHCHTTPResponse {
-		try await withCheckedThrowingContinuation({ c in
+	public func send(request: GHCHTTPRequest) async -> Result<GHCHTTPResponse, RequestError> {
+		await withCheckedContinuation({ c in
 			self.urlSession.dataTask(with: URLRequest(from: request), completionHandler: { data, urlResponse, error in
 				if let error = error {
-					c.resume(throwing: error)
-				}
-				let body: [UInt8]?
+					if let urlError = error as? URLError {
+						c.resume(returning: .failure(.urlError(urlError)))
+					} else {
+						c.resume(returning: .failure(.other(error)))
+					}
 
-				if let d = data {
-					body = Array(d)
 				} else {
-					body = nil
-				}
+					let body: [UInt8]?
 
-				if let httpURLResponse = urlResponse as? HTTPURLResponse {
-					c.resume(returning: GHCHTTPResponse(from: httpURLResponse, body: body))
-				} else {
-					c.resume(throwing: URLSessionClientError.couldNotCastToHTTPURLResponse)
-				}
+					if let d = data {
+						body = Array(d)
+					} else {
+						body = nil
+					}
 
+					if let httpURLResponse = urlResponse as? HTTPURLResponse {
+						c.resume(returning: .success(GHCHTTPResponse(from: httpURLResponse, body: body)))
+					} else {
+						c.resume(returning: .failure(.other(URLSessionError.couldNotCastToHTTPURLResponse)))
+					}
+				}
 			}).resume()
 		})
 	}
 
-	public func shutdown() {}
-}
+	/// This function is the same as `send(request: GHCHTTPRequest)` because URLSession does not support swift-log.
+	public func send(request: GHCHTTPRequest, logger: Logger) async -> Result<GHCHTTPResponse, RequestError> {
+		await self.send(request: request)
+	}
 
-public enum URLSessionClientError: Error {
-	case couldNotCastToHTTPURLResponse
+	public func shutdown() {}
 }
 
 extension URLRequest {

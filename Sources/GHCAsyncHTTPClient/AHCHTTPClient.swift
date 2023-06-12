@@ -6,18 +6,45 @@
 
 import AsyncHTTPClient
 import GenericHTTPClient
+import Logging
 import NIOHTTP1
 
+public enum AHCRequestError: Error {
+	case clientError(HTTPClientError)
+	case other(Error)
+}
+
 public class AHCHTTPClient: GHCHTTPClient {
+	public typealias RequestError = AHCRequestError
+
 	private let httpClient: HTTPClient
 
 	public init(client: HTTPClient = .init(eventLoopGroupProvider: .createNew)) {
 		self.httpClient = client
 	}
 
-	public func send(request: GHCHTTPRequest) async throws -> GHCHTTPResponse {
-		let req = try HTTPClient.Request(from: request)
-		return GHCHTTPResponse(from: try await self.httpClient.execute(request: req).get())
+	public func send(request: GHCHTTPRequest) async -> Result<GHCHTTPResponse, RequestError> {
+		await self.sendInternal(request: request, logger: nil)
+	}
+
+	public func send(request: GHCHTTPRequest, logger: Logger) async -> Result<GHCHTTPResponse, RequestError> {
+		await self.sendInternal(request: request, logger: logger)
+	}
+
+	private func sendInternal(request: GHCHTTPRequest, logger: Logger?) async -> Result<GHCHTTPResponse, RequestError> {
+		do {
+			let req = try HTTPClient.Request(from: request)
+
+			if let logger = logger {
+				return try .success(GHCHTTPResponse(from: await self.httpClient.execute(request: req, logger: logger).get()))
+			} else {
+				return try .success(GHCHTTPResponse(from: await self.httpClient.execute(request: req).get()))
+			}
+		} catch let error as HTTPClientError {
+			return .failure(.clientError(error))
+		} catch {
+			return .failure(.other(error))
+		}
 	}
 
 	public func shutdown() {

@@ -8,6 +8,7 @@ import Foundation
 @testable import GenericHTTPClient
 import GHCAsyncHTTPClient
 import GHCURLSession
+import Logging
 import XCTest
 
 final class GenericHTTPClientTests: XCTestCase {
@@ -24,18 +25,30 @@ final class GenericHTTPClientTests: XCTestCase {
 		)
 
 		let urlSessionClient = URLSessionHTTPClient()
-		let ahcClient = AHCHTTPClient()
+		let ahcClient = AHCHTTPClient(client: .init(eventLoopGroupProvider: .createNew))
 		defer {
 			ahcClient.shutdown()
 		}
 
-		let res = try await urlSessionClient.send(request: req)
-		let res2 = try await ahcClient.send(request: req)
+		let res = await urlSessionClient.send(request: req)
+		let res2 = await ahcClient.send(request: req)
 
-		for r in [res, res2] {
+		var resultsArray: [GHCHTTPResponse] = []
+
+		switch res {
+			case let .success(response): resultsArray.append(response)
+			case let .failure(error): XCTFail("Unexpected error: \(error.localizedDescription)")
+		}
+
+		switch res2 {
+			case let .success(response): resultsArray.append(response)
+			case let .failure(error): XCTFail("Unexpected error: \(error.localizedDescription)")
+		}
+
+		for r in resultsArray {
 			if let body = r.body {
 				let decoded = try JSONDecoder().decode(Response.self, from: Data(body))
-				XCTAssertEqual(decoded.data, data)
+				XCTAssertEqual(decoded.json.string, "Hello, World")
 				XCTAssertEqual(decoded.headers["Content-Type"], "application/json")
 			} else {
 				XCTFail("Response body is nil!")
@@ -53,5 +66,9 @@ extension String {
 
 struct Response: Decodable {
 	let headers: [String: String]
-	let data: String
+	let json: Json
+
+	struct Json: Decodable {
+		let string: String
+	}
 }
