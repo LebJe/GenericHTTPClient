@@ -60,32 +60,33 @@ public struct GHCHTTPHeaders: ExpressibleByDictionaryLiteral, Sequence {
 		self.headers = elements
 	}
 
-	public subscript(key: String) -> String? {
+	public subscript(key: String, caseSensitive caseSensitive: Bool = true) -> String? {
 		get {
-			for (k, v) in self.headers {
-				if k == key {
-					return v
+			self.headers.first(where: {
+				if caseSensitive {
+					return $0.key == key
+				} else {
+					return $0.key.lowercased() == key.lowercased()
 				}
-			}
 
-			return nil
+			})?.value
 		}
 		set {
-			var replacedKey = false
-
-			for i in 0..<self.headers.count {
-				if key == headers[i].key {
-					if let value = newValue {
-						self.headers[i] = (key, value)
-						replacedKey = true
-					} else {
-						self.headers.remove(at: i)
-						replacedKey = true
-					}
-
-					if !replacedKey, let value = newValue {
-						self.headers.append((key, value))
-					}
+			if let index = self.headers.firstIndex(where: {
+				if caseSensitive {
+					return $0.key.lowercased() == key.lowercased()
+				} else {
+					return $0.key == key
+				}
+			}) {
+				if let value = newValue {
+					self.headers[index] = (key, value)
+				} else {
+					self.headers.remove(at: index)
+				}
+			} else {
+				if let value = newValue {
+					self.headers.append((key: key, value: value))
 				}
 			}
 		}
