@@ -17,7 +17,7 @@ final class GenericHTTPClientTests: XCTestCase {
 		{"string": "Hello, World"}
 		"""
 
-		let req = GHCHTTPRequest(
+		let req = try GHCHTTPRequest(
 			url: URL(string: "https://httpbin.org/anything")!,
 			method: .POST,
 			headers: ["Content-Type": "application/json"],
@@ -37,12 +37,12 @@ final class GenericHTTPClientTests: XCTestCase {
 
 		switch res {
 			case let .success(response): resultsArray.append(response)
-			case let .failure(error): XCTFail("Unexpected error: \(error.localizedDescription)")
+			case let .failure(error): XCTFail("Unexpected error: \(error)")
 		}
 
 		switch res2 {
 			case let .success(response): resultsArray.append(response)
-			case let .failure(error): XCTFail("Unexpected error: \(error.localizedDescription)")
+			case let .failure(error): XCTFail("Unexpected error: \(error)")
 		}
 
 		for r in resultsArray {

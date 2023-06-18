@@ -6,12 +6,155 @@
 
 import struct Foundation.URL
 import Logging
+import WebURL
+
+public enum GHCError: Error {
+	/// Network Errors.
+	public enum Network {
+		/// Failed to create TCP connection on time (From AsyncHTTPClient).
+		case connectionTimeout
+
+		/// The hostname could not be resolved.
+		case cannotResolveHostName
+
+		/// The host address could not be resolved using DNS.
+		case cannotResolveHostAddress
+
+		case cannotConnectToHost
+
+		case connectionClosed
+
+		case dnsLookupFailed
+
+		/// Network is unavailable
+		case unavailable(Reason)
+
+		public enum Reason {
+			/// The network is unavailable because the user has given your app permission to use cellular data. (Cellular-enabled
+			/// Apple devices only)
+			///
+			/// - Reference: https://developer.apple.com/documentation/foundation/urlerror/networkunavailablereason/cellular
+			case cellularDataRestricted
+
+			/// A network connection failed because the user was in a phone call, while using a cellular network that does not
+			/// support calling and internet connection simultaneously. (Cellular-enabled Apple devices only)
+			///
+			/// - Reference: https://developer.apple.com/documentation/foundation/urlerror/2293147-callisactive
+			case inPhoneCall
+
+			/// The user enabled Low Data Mode (Apple devices only)
+			///
+			/// - Reference: https://developer.apple.com/documentation/foundation/urlerror/networkunavailablereason/constrained
+			case lowDataMode
+
+			/// The system marked the network interface as expensive (Apple devices only)
+			///
+			/// - Reference: https://developer.apple.com/documentation/foundation/urlerror/networkunavailablereason/expensive
+			case networkMarkedAsExpensive
+
+			/// The attempted connection required activating a data context while roaming, but international roaming is disabled.
+			/// (Cellular-enabled Apple devices only)
+			///
+			/// - Reference: https://developer.apple.com/documentation/foundation/urlerror/2292893-internationalroamingoff
+			case internationalRoamingOff
+
+			/// No internet connection.
+			case notConnected
+
+			/// Network is unreachable (from POSIX `ENETDOWN`)
+			case unreachable
+
+			/// The internet connection was lost during a request.
+			case interruptedConnection
+		}
+	}
+
+	public enum InvalidURL {
+		/// URL scheme is not "http" or "https"
+		case scheme(String)
+		case unparsable
+	}
+
+	public enum Security {
+		public enum ClientCertificate {
+			case rejected
+			case required
+		}
+
+		public enum ServerCertificate {
+			case expired
+			case invalid
+			case unknownRoot
+			case untrusted
+		}
+
+		public enum SSL {
+			case loadPrivateKeyFailed
+			case loadCertificateFailed
+		}
+
+		public enum TLS {
+			case handshakeTimeOut
+		}
+
+		case authenticationRequired
+		case secureConnectionFailed
+		case clientCertificate(ClientCertificate)
+		case serverCertificate(ServerCertificate)
+		case ssl(SSL)
+		case tls(TLS)
+	}
+
+	public enum HTTP {
+		case tooManyRedirects
+		case redirectCycle
+
+		/// The server did not provide a redirect URL.
+		case missingRedirectURL
+
+		case requestTimedOut
+
+		case invalidHeaders(Headers)
+
+		public enum Headers {
+			/// The "Content-Length" header is missing.
+			case missingContentLength
+
+			/// The size of the response body does not match the "Content-Length" header.
+			case mismatchedContentLength
+
+			/// Invalid characters in header names
+			case invalidCharactersInNames([String])
+
+			/// Invalid characters in header values
+			case invalidCharactersInValues([String])
+		}
+	}
+
+	public enum Proxy {
+		case invalidResponse
+
+		/// Unable to create a connection to the proxy within the time limit.
+		case proxyConnectionTimeOut
+
+		/// Proxy requires authentication
+		case authenticationRequired
+	}
+
+	case network(Network)
+	case http(HTTP)
+	case invalidURL(InvalidURL)
+	case proxy(Proxy)
+	case security(Security)
+	case other(Error)
+
+	/// The client failed to convert its internal response structure to ``GHCHTTPResponse``.
+	case castToGHCHTTPResponseFailed
+}
 
 public protocol GHCHTTPClient {
-	associatedtype RequestError: Error
-
-	func send(request: GHCHTTPRequest) async -> Result<GHCHTTPResponse, RequestError>
-	func send(request: GHCHTTPRequest, logger: Logger) async -> Result<GHCHTTPResponse, RequestError>
+	func send(request: GHCHTTPRequest) async -> Result<GHCHTTPResponse, GHCError>
+	func send(request: GHCHTTPRequest, logger: Logger) async -> Result<GHCHTTPResponse, GHCError>
 	func shutdown()
 }
 
@@ -21,7 +164,18 @@ public struct GHCHTTPRequest {
 	public var headers: GHCHTTPHeaders = [:]
 	public var body: [UInt8]?
 
-	public init(url: URL, method: GHCHTTPMethod = .GET, headers: GHCHTTPHeaders = [:], body: Self.HTTPBody? = nil) {
+	/// - Throws: ``GHCError``
+	public init(url: URL, method: GHCHTTPMethod = .GET, headers: GHCHTTPHeaders = [:], body: Self.HTTPBody? = nil) throws {
+		// Validate URL
+		guard let webURL = WebURL(url.absoluteString) else {
+			throw GHCError.invalidURL(.unparsable)
+		}
+
+		// Scheme
+		guard webURL.scheme.contains("http") || webURL.scheme.contains("https") else {
+			throw GHCError.invalidURL(.scheme(webURL.scheme))
+		}
+
 		self.url = url
 		self.method = method
 		self.headers = headers

@@ -13,27 +13,19 @@ import Foundation
 	import FoundationNetworking
 #endif
 
-public enum URLSessionError: Error {
-	case couldNotCastToHTTPURLResponse
-	case urlError(URLError)
-	case other(Error)
-}
-
 public class URLSessionHTTPClient: GHCHTTPClient {
-	public typealias RequestError = URLSessionError
-
 	private let urlSession: URLSession
 
 	public init(session: URLSession = .shared) {
 		self.urlSession = session
 	}
 
-	public func send(request: GHCHTTPRequest) async -> Result<GHCHTTPResponse, RequestError> {
+	public func send(request: GHCHTTPRequest) async -> Result<GHCHTTPResponse, GHCError> {
 		await withCheckedContinuation({ c in
 			self.urlSession.dataTask(with: URLRequest(from: request), completionHandler: { data, urlResponse, error in
 				if let error = error {
 					if let urlError = error as? URLError {
-						c.resume(returning: .failure(.urlError(urlError)))
+						c.resume(returning: .failure(urlError.error))
 					} else {
 						c.resume(returning: .failure(.other(error)))
 					}
@@ -50,7 +42,7 @@ public class URLSessionHTTPClient: GHCHTTPClient {
 					if let httpURLResponse = urlResponse as? HTTPURLResponse {
 						c.resume(returning: .success(GHCHTTPResponse(from: httpURLResponse, body: body)))
 					} else {
-						c.resume(returning: .failure(.other(URLSessionError.couldNotCastToHTTPURLResponse)))
+						c.resume(returning: .failure(.castToGHCHTTPResponseFailed))
 					}
 				}
 			}).resume()
@@ -58,7 +50,7 @@ public class URLSessionHTTPClient: GHCHTTPClient {
 	}
 
 	/// This function is the same as `send(request: GHCHTTPRequest)` because URLSession does not support swift-log.
-	public func send(request: GHCHTTPRequest, logger: Logger) async -> Result<GHCHTTPResponse, RequestError> {
+	public func send(request: GHCHTTPRequest, logger: Logger) async -> Result<GHCHTTPResponse, GHCError> {
 		await self.send(request: request)
 	}
 
@@ -91,5 +83,31 @@ extension GHCHTTPResponse {
 		})
 
 		self.init(headers: .init(h), statusCode: response.statusCode, body: body)
+	}
+}
+
+extension URLError {
+	var error: GHCError {
+		switch self.code {
+			case .callIsActive: return .network(.unavailable(.inPhoneCall))
+			case .cannotConnectToHost: return .network(.cannotConnectToHost)
+			case .cannotFindHost: return .network(.cannotResolveHostName)
+			case .clientCertificateRejected: return .security(.clientCertificate(.rejected))
+			case .clientCertificateRequired: return .security(.clientCertificate(.required))
+			case .dnsLookupFailed: return .network(.dnsLookupFailed)
+			case .httpTooManyRedirects: return .http(.tooManyRedirects)
+			case .internationalRoamingOff: return .network(.unavailable(.internationalRoamingOff))
+			case .networkConnectionLost: return .network(.unavailable(.interruptedConnection))
+			case .notConnectedToInternet: return .network(.unavailable(.notConnected))
+			case .redirectToNonExistentLocation: return .http(.missingRedirectURL)
+			case .serverCertificateHasBadDate: return .security(.serverCertificate(.expired))
+			case .serverCertificateHasUnknownRoot: return .security(.serverCertificate(.unknownRoot))
+			case .serverCertificateNotYetValid: return .security(.serverCertificate(.invalid))
+			case .serverCertificateUntrusted: return .security(.serverCertificate(.untrusted))
+			case .secureConnectionFailed: return .security(.secureConnectionFailed)
+			case .timedOut: return .http(.requestTimedOut)
+			case .userAuthenticationRequired: return .security(.authenticationRequired)
+			default: return .other(self)
+		}
 	}
 }
